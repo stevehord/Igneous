@@ -13,6 +13,7 @@ c:\Go\src
 # Build:
 
 cd Igneous/tftp/cmd/tftpd
+
 go build
 
 Expected output tftpd
@@ -20,6 +21,10 @@ Expected output tftpd
 # Run
 chmod +x tftpd
 go tftpd
+
+# Testing with a Mac built in tftp Client
+/usr/bin/tftp 127.0.0.1
+put testFiles/test_small.txt
 
 # Unit Tests:
 There are two new unit tests that cover readed and writting to the FS
