@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	tftp "igneous.io/tftp/cmd"
+	tftp "igneous/tftp/cmd"
 )
 
 var (
