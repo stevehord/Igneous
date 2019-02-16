@@ -1,7 +1,6 @@
 # Igneous.io
 Sample TFTP Code Project with limits. 
-Files are "PUT" only the the stdout - they are not written to the fs. Not held in memory after being displayed
-Files that are Read "Get" must exist on th  
+Files are "PUT" only into local memory and written to stdout for dubgging. They are not written to the filesystem. "GETS" must process against a file that has been successfully "PUT" using the same filename.  "GET"ing a non existant file with return zero bytes
 
 # Installation:
 Download to your go/src folder typically 
