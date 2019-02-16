@@ -1,8 +1,6 @@
 package tftp
 
 import (
-	"fmt"
-	"os/exec"
 	"reflect"
 	"testing"
 )
@@ -98,20 +96,11 @@ func TestDeserializationInvalid(t *testing.T) {
 	}
 }
 
-func TestUploadFile(t *testing.T) {
-	fmt.Println("File upload test")
-	cmd := exec.Command("/usr/bin/tftp", "127.0.0.1")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("cmd.Run() failed with %s\n", err)
-	}
-	fmt.Printf("combined out:\n%s\n", string(out))
+func TestReadFile(t *testing.T) {
+	main.
+		main.readFileContent("test_small.txt")
+}
 
-	cmd2 := exec.Command("put", "testExe.txt")
-	out2, err2 := cmd2.CombinedOutput()
+func TestWriteFile(t *testing.T) {
 
-	if err2 != nil {
-		t.Errorf("cmd.Run()2 failed with %s\n", err)
-	}
-	fmt.Printf("combined out:\n%s\n", string(out2))
 }

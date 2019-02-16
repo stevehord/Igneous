@@ -1,31 +1,32 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	tftp "igneous/tftp/cmd"
 	"log"
 	"net"
-	"os"
-
-	tftp "igneous/tftp/cmd"
+	"unicode"
 )
 
 var (
-	host     string
-	storeMap map[string][]byte
-	// store          []byte
+	host           string
+	storeMap       map[string]string
+	fileStore      map[string][]byte
 	bufferSize     int
 	bufferDataSize int
-	res            tftp.PacketData
 )
 
 func main() {
 	// TODO implement the in-memory tftp server
-	host = "127.0.0.1:69"
-	bufferSize = 516 // Default tftp spec buffer size??? Could be trouble
-	bufferDataSize = 512
-	storeMap = make(map[string][]byte)
+
 	fmt.Println("Hello TFTP")
+
+	host = "127.0.0.1:69"
+	bufferSize = 516     // Default tftp spec buffer size??? Could be trouble
+	bufferDataSize = 512 // Typical size of the data packets
+	fileStore = make(map[string][]byte)
+	storeMap = make(map[string]string)
 
 	conn, err := net.ListenPacket("udp", host)
 	if err != nil {
@@ -38,8 +39,6 @@ func main() {
 		buf := make([]byte, bufferSize) //TODO
 		bufLength, sourceAddr, err := conn.ReadFrom(buf)
 
-		// fmt.Printf("buffLength: %d\n", bufLength)
-		// fmt.Printf("addr: %s\n", sourceAddr)
 		if err != nil {
 			fmt.Printf("Read Error: %s\n", err)
 			continue
@@ -54,16 +53,13 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 
 	p, err := tftp.ParsePacket(buf)
 	if err != nil {
-		fmt.Printf("Parse Error: %s", err)
+		fmt.Printf("Halt - Parse Error: %s", err)
 	}
 
 	switch v := p.(type) {
 	// Process the header
 	case *tftp.PacketRequest:
 		pkRequest := p.(*tftp.PacketRequest)
-		// fmt.Printf("Packet Operation %v\n", pkRequest.Op)
-		// fmt.Printf("Packet Mode %v\n", pkRequest.Mode)
-		// fmt.Printf("Packet filename %v\n", pkRequest.Filename)
 
 		// Process a GET
 		if pkRequest.Op == 1 {
@@ -72,26 +68,39 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 
 		// Process a PUT ack
 		if pkRequest.Op == 2 {
+			//Map the source Addr + port to a specfic file name (poormans threading)
+			storeMap[srcAddr.String()] = pkRequest.Filename
+
+			// Reset the fileStore for a new file
+			fmt.Printf("buffLength Ack: %v\n", bufLength)
+			fileStore[pkRequest.Filename] = make([]byte, 0, 0)
+
+			// return a Ack to start the data transfer
 			res := tftp.PacketAck{BlockNum: 0}
 			conn.WriteTo(res.Serialize(), srcAddr)
 		}
-	// Process the main Data
+
+	// Process the main PUT data packets
 	case *tftp.PacketData:
-		source := srcAddr.String()
 		pkData := p.(*tftp.PacketData)
-		// fmt.Printf("Packet Data Length %v\n", bufLength)
-		storeMap[source] = append(storeMap[source], pkData.Data...)
-		// fmt.Println(string(pkData.Data))
+
+		// Unpack the file name using the upload address + port
+		fileName := storeMap[srcAddr.String()]
+
+		//Store the date with control chars removed - TODO: verify this is correct behavior
+		fileStore[fileName] = append(fileStore[fileName], bytes.TrimFunc(pkData.Data, unicode.IsControl)...)
+
+		// Return Ack with block number to start next block
 		res := tftp.PacketAck{BlockNum: pkData.BlockNum}
 		conn.WriteTo(res.Serialize(), srcAddr)
 
 		// Requirement to print the entire file at the end of the upload.
 		// Any bufer less than 512 should indicate the upload is complete.
 		if bufLength < bufferDataSize {
-			printBuffer(storeMap[source])
-			// storeMap[source] = make([]byte, 0) //Clear the buffer? TODO: Look for memory leak here.
-			delete(storeMap, source)
+			// fmt.Println(len(fileStore[fileName]))
+			printBuffer(fileStore[fileName])
 		}
+
 	// Process Packet errors  TODO: Needs testcase
 	case *tftp.PacketError:
 		pkData := p.(*tftp.PacketError)
@@ -99,6 +108,7 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 		res := tftp.PacketAck{BlockNum: 1}
 		conn.WriteTo(res.Serialize(), srcAddr)
 
+	// Nothing to do here but acknolege the response
 	case *tftp.PacketAck:
 		pkData := p.(*tftp.PacketAck)
 		fmt.Printf("PacketAck: %v\n", string(pkData.BlockNum))
@@ -108,27 +118,34 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 	}
 }
 
+/*
+ * helper function to manage downloading of files larger than bufferDataSize
+ *
+ */
 func processGet(conn net.PacketConn, pkRequest *tftp.PacketRequest, srcAddr net.Addr) {
-	content := readFileContent(pkRequest.Filename)
-	fmt.Println(content[:10])
+	content := fileStore[pkRequest.Filename]
+	fmt.Println(len(content))
 
 	// Create a packet of 512 or the actual size of remainning buffer
 	bufLengthRemain := len(content)
 	var blockNum uint16
 	var x int
 
+	// Segment the file into 512k sections and send
+	// last segement is empty to signal download complete
 	for {
 		blockNum++
 		// fmt.Printf("bufLengthRemain: %v  x:%v block:%v\n", bufLengthRemain, x, blockNum)
 		if bufLengthRemain > bufferDataSize {
-			res = tftp.PacketData{blockNum, content[x : x+bufferDataSize]}
+			res := tftp.PacketData{blockNum, content[x : x+bufferDataSize]}
 			bufLengthRemain = bufLengthRemain - bufferDataSize
 			x = x + bufferDataSize
 			conn.WriteTo(res.Serialize(), srcAddr)
 		} else {
-			res = tftp.PacketData{blockNum, content[x : x+bufLengthRemain]}
+			res := tftp.PacketData{blockNum, content[x : x+bufLengthRemain]}
 			conn.WriteTo(res.Serialize(), srcAddr)
-			//send empty packet to close connection
+
+			//send empty packet to end connection
 			res = tftp.PacketData{blockNum + 1, make([]byte, 0)}
 			conn.WriteTo(res.Serialize(), srcAddr)
 			break
@@ -136,39 +153,12 @@ func processGet(conn net.PacketConn, pkRequest *tftp.PacketRequest, srcAddr net.
 	}
 }
 
+/*
+ * Print the buffer to stdout with help to make readable
+ *
+ */
 func printBuffer(buf []byte) {
-	fmt.Println("----------------------")
+	fmt.Println("------Start----------------")
 	fmt.Println(string(buf))
-	fmt.Println("----------------------")
-}
-
-func writeBufferToFileSystem(path string, buf []byte) {
-	// open output file
-	fo, err := os.Create(path)
-	if err != nil {
-		fmt.Println(err)
-	}
-	// close fo on exit print exit if any
-	defer func() {
-		if err := fo.Close(); err != nil {
-			fmt.Println(err)
-		}
-	}()
-
-	n, err := fo.Write(buf)
-	fmt.Printf("%v Bytes Written", n)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func readFileContent(filePath string) (fileContent []byte) {
-	file, err := os.Open("testFiles/" + filePath)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer file.Close() // golang magic
-
-	b, err := ioutil.ReadAll(file)
-	return b
+	fmt.Println("------End----------------")
 }
