@@ -27,16 +27,23 @@ go tftpd
 put testFiles/test_small.txt
 
 # Unit Tests:
-There are two new unit tests that cover readed and writting to the FS
+None
 
-#Integration Tests
+# Integration Tests
 ./test_put.sh . - sequentially uploads one small file and one large (multi-packet) file
-./multi_file_upload.sh - Concurently runs the test_put.sh file three times
+./test_get.sh . - sequentially uploads one small file and one large (multi-packet) file and retrieves them 
+./multi_file_upload.sh - Concurently runs the test_put.sh file three times 
 
-Note: There is no validation. You must view the results in the output window
+Note: There is no validation. You must view the results in the output window and check file sizes
 
 
 # ToDo:
 Error Handling - none
+
 Memory Leak Testing - none
+
 Concurrent File handling - Likely works but with limited testing
+
+Uploading multiple files with the same file name concurrently is not supported. It will produce incorrect results. There is no attempt to increment file names
+
+
