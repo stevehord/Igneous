@@ -23,7 +23,7 @@ chmod +x tftpd
 
 go tftpd
 
-# Testing with a Mac built in tftp Client
+# Testing with a Mac built-in tftp Client
 /usr/bin/tftp 127.0.0.1
 
 put testFiles/test_small.txt
