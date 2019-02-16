@@ -15,7 +15,6 @@ cd Igneous/tftp/cmd/tftpd
 
 go build
 
-Expected output - tftpd
 
 # Run
 chmod +x tftpd
