@@ -7,12 +7,14 @@ import (
 	"log"
 	"net"
 	"unicode"
+
+	"golang.org/x/sync/syncmap"
 )
 
 var (
 	host           string
-	storeMap       map[string]string
-	fileStore      map[string][]byte
+	fileStore      syncmap.Map
+	storeMap       syncmap.Map
 	bufferSize     int
 	bufferDataSize int
 )
@@ -25,8 +27,6 @@ func main() {
 	host = "127.0.0.1:69"
 	bufferSize = 516     // Default tftp spec buffer size??? Could be trouble
 	bufferDataSize = 512 // Typical size of the data packets
-	fileStore = make(map[string][]byte)
-	storeMap = make(map[string]string)
 
 	conn, err := net.ListenPacket("udp", host)
 	if err != nil {
@@ -69,10 +69,10 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 		// Process a PUT ack
 		if pkRequest.Op == 2 {
 			//Map the source Addr + port to a specfic file name (poormans threading)
-			storeMap[srcAddr.String()] = pkRequest.Filename
+			storeMap.Store(srcAddr.String(), pkRequest.Filename)
 
 			// Reset the fileStore for a new file
-			fileStore[pkRequest.Filename] = make([]byte, 0, 0)
+			fileStore.Store(pkRequest.Filename, make([]byte, 0, 0))
 
 			// return a Ack to start the data transfer
 			res := tftp.PacketAck{BlockNum: 0}
@@ -84,10 +84,11 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 		pkData := p.(*tftp.PacketData)
 
 		// Unpack the file name using the upload address + port
-		fileName := storeMap[srcAddr.String()]
+		fileName, _ := storeMap.Load(srcAddr.String())
 
 		//Store the date with control chars removed - TODO: verify this is correct behavior
-		fileStore[fileName] = append(fileStore[fileName], bytes.TrimFunc(pkData.Data, unicode.IsControl)...)
+		temp, _ := fileStore.Load(fileName.(string))
+		fileStore.Store(fileName.(string), append(temp.([]byte), bytes.TrimFunc(pkData.Data, unicode.IsControl)...))
 
 		// Return Ack with block number to start next block
 		res := tftp.PacketAck{BlockNum: pkData.BlockNum}
@@ -97,7 +98,8 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 		// Any bufer less than 512 should indicate the upload is complete.
 		if bufLength < bufferDataSize {
 			// fmt.Println(len(fileStore[fileName]))
-			printBuffer(fileStore[fileName])
+			buf, _ := fileStore.Load(fileName.(string))
+			printBuffer(buf.([]byte))
 		}
 
 	// Process Packet errors  TODO: Needs testcase
@@ -109,8 +111,7 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 
 	// Nothing to do here but acknolege the response
 	case *tftp.PacketAck:
-		pkData := p.(*tftp.PacketAck)
-		fmt.Printf("PacketAck: %v\n", string(pkData.BlockNum))
+		// fmt.Printf("PacketAck: %v\n", string(pkData.BlockNum))
 
 	default:
 		fmt.Printf("I don't know about type %T!\n", v)
@@ -122,8 +123,8 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
  *
  */
 func processGet(conn net.PacketConn, pkRequest *tftp.PacketRequest, srcAddr net.Addr) {
-	content := fileStore[pkRequest.Filename]
-	fmt.Println(len(content))
+	z, _ := fileStore.Load(pkRequest.Filename)
+	content := z.([]byte)
 
 	// Create a packet of 512 or the actual size of remainning buffer
 	bufLengthRemain := len(content)
