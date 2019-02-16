@@ -24,7 +24,7 @@ go ./tftpd
 
 note: server opens port 69 and may require priveldges 
 
-sudo ./tftpd
+sudo go ./tftpd
 
 # Testing with a Mac built-in tftp Client
 /usr/bin/tftp 127.0.0.1
