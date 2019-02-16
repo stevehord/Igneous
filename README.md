@@ -13,6 +13,8 @@ c:\Go\src
 
 cd Igneous/tftp/cmd/tftpd
 
+go get
+
 go build
 
 
