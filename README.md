@@ -17,13 +17,12 @@ go build
 
 
 # Run
+Depending on your system you may need to make the output executable
 chmod +x tftpd
-
-go ./tftpd
 
 note: server opens port 69 and may require priveldges 
 
-sudo go ./tftpd
+sudo ./tftpd
 
 # Testing with a Mac built-in tftp Client
 /usr/bin/tftp 127.0.0.1
