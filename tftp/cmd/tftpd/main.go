@@ -72,7 +72,6 @@ func process(buf []byte, conn net.PacketConn, srcAddr net.Addr, bufLength int) {
 			storeMap[srcAddr.String()] = pkRequest.Filename
 
 			// Reset the fileStore for a new file
-			fmt.Printf("buffLength Ack: %v\n", bufLength)
 			fileStore[pkRequest.Filename] = make([]byte, 0, 0)
 
 			// return a Ack to start the data transfer
