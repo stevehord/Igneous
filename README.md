@@ -1,6 +1,6 @@
 # Igneous.io
 Sample TFTP Code Project with limits. 
-Files are "PUT" only into local memory and written to stdout for dubgging. They are not written to the filesystem. "GETS" must process against a file that has been successfully "PUT" using the same filename.  "GET"ing a non existant file with return zero bytes
+Files are "PUT" only into local memory and written to stdout for dubgging. They are not written to the filesystem. "GETS" must process against a file that has been successfully "PUT" using the same filename.  "GET"ing a non existant file will return zero bytes
 
 # Installation:
 Download to your go/src folder typically 
@@ -21,6 +21,10 @@ Expected output - tftpd
 chmod +x tftpd
 
 go ./tftpd
+
+note: server opens port 69 and may require priveldges 
+
+sudo ./tftpd
 
 # Testing with a Mac built-in tftp Client
 /usr/bin/tftp 127.0.0.1
