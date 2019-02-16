@@ -43,11 +43,13 @@ Note: There is no validation. You must view the results in the output window and
 
 
 # ToDo:
-Error Handling - none 
+Windows Build - none
+
+Error Handling - limited 
 
 Memory Leak Testing - none
 
-Concurrent File handling - Likely works but with lots of limits
+Concurrent File handling - Works but with lots of limits. Needs improved testing
 
 Uploading multiple files with the same file name concurrently is not supported. It will produce incorrect results. There is no attempt to guarentee unique file names
 
